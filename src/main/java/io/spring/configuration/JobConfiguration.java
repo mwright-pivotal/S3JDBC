@@ -16,6 +16,7 @@
 package io.spring.configuration;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
@@ -47,13 +48,13 @@ import org.springframework.cloud.task.batch.partition.CommandLineArgsProvider;
 import org.springframework.cloud.task.batch.partition.DeployerPartitionHandler;
 import org.springframework.cloud.task.batch.partition.DeployerStepExecutionHandler;
 import org.springframework.cloud.task.batch.partition.NoOpEnvironmentVariablesProvider;
-import org.springframework.cloud.task.batch.partition.PassThroughCommandLineArgsProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.core.io.support.ResourcePatternResolver;
 
 /**
@@ -73,12 +74,15 @@ public class JobConfiguration {
 
 	@Autowired
 	private JobBuilderFactory jobBuilderFactory;
+	
+	@Value("${taskArtifactUri}")
+	private String taskArtifactUri;
 
 	@Bean
 	@Profile("master")
 	public Partitioner partitioner() throws IOException {
 		Resource[] resources =
-				this.resourcePatternResolver.getResources("s3://connected-car-artifacts/inputs/*.csv");
+				this.resourcePatternResolver.getResources("s3://connected-car-artifacts-mpw/inputs/*.csv");
 
 		MultiResourcePartitioner partitioner = new MultiResourcePartitioner();
 		partitioner.setResources(resources);
@@ -106,11 +110,19 @@ public class JobConfiguration {
 	public DeployerPartitionHandler partitionHandler(TaskLauncher taskLauncher,
 			JobExplorer jobExplorer,
 			CommandLineArgsProvider commandLineArgsProvider) {
+		UrlResource artifact = null;
+		try {
+			artifact = new UrlResource(taskArtifactUri);
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
 		DeployerPartitionHandler partitionHandler =
 				new DeployerPartitionHandler(taskLauncher,
 						jobExplorer,
-						context.getResource("http://github.com/mminella/task_jars/raw/master/s3jdbc-0.0.1-SNAPSHOT.jar"),
+						artifact,
 						"load");
+		//context.getResource("http://github.com/mminella/task_jars/raw/master/s3jdbc-0.0.1-SNAPSHOT.jar"),
 
 		partitionHandler.setCommandLineArgsProvider(commandLineArgsProvider);
 		partitionHandler.setEnvironmentVariablesProvider(new NoOpEnvironmentVariablesProvider());
